@@ -5,9 +5,12 @@ import {
   HubConnectionBuilder,
   LogLevel,
 } from "@microsoft/signalr";
+import { Messages } from "./interfaces/message";
+import ChatRoom from "./components/ChatRoom";
 
 function App() {
   const [conn, setConnection] = useState<HubConnection | undefined>();
+  const [messages, setMessages] = useState<Messages[]>([]);
 
   const joinChatRoom = async (userName: string, chatRoom: string) => {
     const connection = new HubConnectionBuilder()
@@ -15,9 +18,16 @@ function App() {
       .configureLogging(LogLevel.Information)
       .build();
 
-    connection.on("JoinSpecificChatRoom", (user: string, message: string) => {
-      console.log("Received message:", user, message);
+    connection.on("ReceiveMessage", (message: string) => {
+      console.log("Received message:", message);
     });
+
+    connection.on(
+      "ReceiveSpecificMessage",
+      (userName: string, message: string) => {
+        setMessages((prevMessages) => [...prevMessages, { userName, message }]);
+      }
+    );
 
     await connection.start();
     await connection.invoke("JoinSpecificChatRoom", {
@@ -28,11 +38,22 @@ function App() {
     setConnection(connection);
   };
 
+  const sendMessage = async (message: string) => {
+    if (conn) {
+      console.log("Sending message:", message);
+      await conn.invoke("SendMessage", message);
+    }
+  };
+
   return (
     <div className="flex justify-center items-center h-screen w-full">
       <div className="w-full">
         <h1>Welcome to Mk ChatApp</h1>
-        <WaitingRoom joinChatRoom={joinChatRoom} />
+        {!conn ? (
+          <WaitingRoom joinChatRoom={joinChatRoom} />
+        ) : (
+          <ChatRoom messages={messages} sendMessage={sendMessage} />
+        )}
       </div>
     </div>
   );
